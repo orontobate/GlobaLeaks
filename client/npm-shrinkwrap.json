@@ -13,9 +13,9 @@
       "resolved": "https://registry.npmjs.org/@flowjs/ng-flow/-/ng-flow-2.7.7.tgz"
     },
     "@types/node": {
-      "version": "6.0.93",
+      "version": "6.0.94",
       "from": "@types/node@>=6.0.46 <7.0.0",
-      "resolved": "https://registry.npmjs.org/@types/node/-/node-6.0.93.tgz",
+      "resolved": "https://registry.npmjs.org/@types/node/-/node-6.0.94.tgz",
       "dev": true
     },
     "@types/q": {
@@ -356,9 +356,9 @@
       "optional": true
     },
     "blocking-proxy": {
-      "version": "0.0.5",
-      "from": "blocking-proxy@0.0.5",
-      "resolved": "https://registry.npmjs.org/blocking-proxy/-/blocking-proxy-0.0.5.tgz",
+      "version": "1.0.1",
+      "from": "blocking-proxy@>=1.0.0 <2.0.0",
+      "resolved": "https://registry.npmjs.org/blocking-proxy/-/blocking-proxy-1.0.1.tgz",
       "dev": true
     },
     "body-parser": {
@@ -1235,9 +1235,9 @@
       }
     },
     "eslint": {
-      "version": "4.12.0",
-      "from": "eslint@4.12.0",
-      "resolved": "https://registry.npmjs.org/eslint/-/eslint-4.12.0.tgz",
+      "version": "4.13.1",
+      "from": "eslint@4.13.1",
+      "resolved": "https://registry.npmjs.org/eslint/-/eslint-4.13.1.tgz",
       "dev": true
     },
     "eslint-scope": {
@@ -2993,9 +2993,9 @@
       "dev": true
     },
     "openpgp": {
-      "version": "2.5.13",
-      "from": "openpgp@2.5.13",
-      "resolved": "https://registry.npmjs.org/openpgp/-/openpgp-2.5.13.tgz"
+      "version": "2.6.0",
+      "from": "openpgp@2.6.0",
+      "resolved": "https://registry.npmjs.org/openpgp/-/openpgp-2.6.0.tgz"
     },
     "opn": {
       "version": "4.0.2",
@@ -3188,9 +3188,9 @@
       "dev": true
     },
     "protractor": {
-      "version": "5.2.0",
-      "from": "protractor@5.2.0",
-      "resolved": "https://registry.npmjs.org/protractor/-/protractor-5.2.0.tgz",
+      "version": "5.2.2",
+      "from": "protractor@5.2.2",
+      "resolved": "https://registry.npmjs.org/protractor/-/protractor-5.2.2.tgz",
       "dev": true,
       "dependencies": {
         "adm-zip": {
@@ -3686,9 +3686,9 @@
       "dev": true
     },
     "superagent": {
-      "version": "3.8.1",
-      "from": "superagent@3.8.1",
-      "resolved": "https://registry.npmjs.org/superagent/-/superagent-3.8.1.tgz",
+      "version": "3.8.2",
+      "from": "superagent@3.8.2",
+      "resolved": "https://registry.npmjs.org/superagent/-/superagent-3.8.2.tgz",
       "dev": true
     },
     "supertest": {
