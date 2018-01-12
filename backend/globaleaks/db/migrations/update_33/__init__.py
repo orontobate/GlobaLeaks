@@ -1,189 +1,187 @@
 # -*- coding: utf-8 -*-
-
-from storm.locals import Int, Bool, Unicode, DateTime, JSON
-
 from globaleaks import __version__, DATABASE_VERSION, LANGUAGES_SUPPORTED_CODES, models
 from globaleaks.db.migrations.update import MigrationBase
+from globaleaks.models.properties import *
 from globaleaks.utils.utility import datetime_now, datetime_null
 
 
 class Node_v_32(models.ModelWithID):
-    __storm_table__ = 'node'
-    version = Unicode(default=unicode(__version__))
-    version_db = Unicode(default=unicode(DATABASE_VERSION))
-    name = Unicode(default=u'')
-    basic_auth = Bool(default=False)
-    basic_auth_username = Unicode(default=u'')
-    basic_auth_password = Unicode(default=u'')
-    public_site = Unicode(default=u'')
-    hidden_service = Unicode(default=u'')
-    receipt_salt = Unicode()
-    languages_enabled = JSON(default=LANGUAGES_SUPPORTED_CODES)
-    default_language = Unicode(default=u'en')
-    default_timezone = Int(default=0)
-    default_password = Unicode(default=u'globaleaks')
-    description = JSON(default_factory=dict)
-    presentation = JSON(default_factory=dict)
-    footer = JSON(default_factory=dict)
-    security_awareness_title = JSON(default_factory=dict)
-    security_awareness_text = JSON(default_factory=dict)
-    maximum_namesize = Int(default=128)
-    maximum_textsize = Int(default=4096)
-    maximum_filesize = Int(default=30)
-    tor2web_admin = Bool(default=True)
-    tor2web_custodian = Bool(default=True)
-    tor2web_whistleblower = Bool(default=False)
-    tor2web_receiver = Bool(default=True)
-    tor2web_unauth = Bool(default=True)
-    allow_unencrypted = Bool(default=False)
-    disable_encryption_warnings = Bool(default=False)
-    allow_iframes_inclusion = Bool(default=False)
-    submission_minimum_delay = Int(default=10)
-    submission_maximum_ttl = Int(default=10800)
-    can_postpone_expiration = Bool(default=False)
-    can_delete_submission = Bool(default=False)
-    can_grant_permissions = Bool(default=False)
-    ahmia = Bool(default=False)
-    allow_indexing = Bool(default=False)
-    wizard_done = Bool(default=False)
+    __tablename__ = 'node'
+    version = Column(String, default=unicode(__version__))
+    version_db = Column(String, default=unicode(DATABASE_VERSION))
+    name = Column(String, default=u'')
+    basic_auth = Column(BOOLEAN, default=False)
+    basic_auth_username = Column(String, default=u'')
+    basic_auth_password = Column(String, default=u'')
+    public_site = Column(String, default=u'')
+    hidden_service = Column(String, default=u'')
+    receipt_salt = Column(String)
+    languages_enabled = Column(JSON, default=LANGUAGES_SUPPORTED_CODES)
+    default_language = Column(String, default=u'en')
+    default_timezone = Column(Integer, default=0)
+    default_password = Column(String, default=u'globaleaks')
+    description = Column(JSON, default=dict)
+    presentation = Column(JSON, default=dict)
+    footer = Column(JSON, default=dict)
+    security_awareness_title = Column(JSON, default=dict)
+    security_awareness_text = Column(JSON, default=dict)
+    maximum_namesize = Column(Integer, default=128)
+    maximum_textsize = Column(Integer, default=4096)
+    maximum_filesize = Column(Integer, default=30)
+    tor2web_admin = Column(BOOLEAN, default=True)
+    tor2web_custodian = Column(BOOLEAN, default=True)
+    tor2web_whistleblower = Column(BOOLEAN, default=False)
+    tor2web_receiver = Column(BOOLEAN, default=True)
+    tor2web_unauth = Column(BOOLEAN, default=True)
+    allow_unencrypted = Column(BOOLEAN, default=False)
+    disable_encryption_warnings = Column(BOOLEAN, default=False)
+    allow_iframes_inclusion = Column(BOOLEAN, default=False)
+    submission_minimum_delay = Column(Integer, default=10)
+    submission_maximum_ttl = Column(Integer, default=10800)
+    can_postpone_expiration = Column(BOOLEAN, default=False)
+    can_delete_submission = Column(BOOLEAN, default=False)
+    can_grant_permissions = Column(BOOLEAN, default=False)
+    ahmia = Column(BOOLEAN, default=False)
+    allow_indexing = Column(BOOLEAN, default=False)
+    wizard_done = Column(BOOLEAN, default=False)
 
-    disable_submissions = Bool(default=False)
-    disable_privacy_badge = Bool(default=False)
-    disable_security_awareness_badge = Bool(default=False)
-    disable_security_awareness_questions = Bool(default=False)
-    disable_key_code_hint = Bool(default=False)
-    disable_donation_panel = Bool(default=False)
+    disable_submissions = Column(BOOLEAN, default=False)
+    disable_privacy_badge = Column(BOOLEAN, default=False)
+    disable_security_awareness_badge = Column(BOOLEAN, default=False)
+    disable_security_awareness_questions = Column(BOOLEAN, default=False)
+    disable_key_code_hint = Column(BOOLEAN, default=False)
+    disable_donation_panel = Column(BOOLEAN, default=False)
 
-    enable_captcha = Bool(default=True)
-    enable_proof_of_work = Bool(default=True)
+    enable_captcha = Column(BOOLEAN, default=True)
+    enable_proof_of_work = Column(BOOLEAN, default=True)
 
-    enable_experimental_features = Bool(default=False)
+    enable_experimental_features = Column(BOOLEAN, default=False)
 
-    whistleblowing_question = JSON(default_factory=dict)
-    whistleblowing_button = JSON(default_factory=dict)
-    whistleblowing_receipt_prompt = JSON(default_factory=dict)
+    whistleblowing_question = Column(JSON, default=dict)
+    whistleblowing_button = Column(JSON, default=dict)
+    whistleblowing_receipt_prompt = Column(JSON, default=dict)
 
-    simplified_login = Bool(default=True)
+    simplified_login = Column(BOOLEAN, default=True)
 
-    enable_custom_privacy_badge = Bool(default=False)
-    custom_privacy_badge_tor = JSON(default_factory=dict)
-    custom_privacy_badge_none = JSON(default_factory=dict)
+    enable_custom_privacy_badge = Column(BOOLEAN, default=False)
+    custom_privacy_badge_tor = Column(JSON, default=dict)
+    custom_privacy_badge_none = Column(JSON, default=dict)
 
-    header_title_homepage = JSON(default_factory=dict)
-    header_title_submissionpage = JSON(default_factory=dict)
-    header_title_receiptpage = JSON(default_factory=dict)
-    header_title_tippage = JSON(default_factory=dict)
+    header_title_homepage = Column(JSON, default=dict)
+    header_title_submissionpage = Column(JSON, default=dict)
+    header_title_receiptpage = Column(JSON, default=dict)
+    header_title_tippage = Column(JSON, default=dict)
 
-    widget_comments_title = JSON(default_factory=dict)
-    widget_messages_title = JSON(default_factory=dict)
-    widget_files_title = JSON(default_factory=dict)
+    widget_comments_title = Column(JSON, default=dict)
+    widget_messages_title = Column(JSON, default=dict)
+    widget_files_title = Column(JSON, default=dict)
 
-    landing_page = Unicode(default=u'homepage')
+    landing_page = Column(String, default=u'homepage')
 
-    contexts_clarification = JSON(default_factory=dict)
-    show_small_context_cards = Bool(default=False)
-    show_contexts_in_alphabetical_order = Bool(default=False)
+    contexts_clarification = Column(JSON, default=dict)
+    show_small_context_cards = Column(BOOLEAN, default=False)
+    show_contexts_in_alphabetical_order = Column(BOOLEAN, default=False)
 
-    threshold_free_disk_megabytes_high = Int(default=200)
-    threshold_free_disk_megabytes_medium = Int(default=500)
-    threshold_free_disk_megabytes_low = Int(default=1000)
+    threshold_free_disk_megabytes_high = Column(Integer, default=200)
+    threshold_free_disk_megabytes_medium = Column(Integer, default=500)
+    threshold_free_disk_megabytes_low = Column(Integer, default=1000)
 
-    threshold_free_disk_percentage_high = Int(default=3)
-    threshold_free_disk_percentage_medium = Int(default=5)
-    threshold_free_disk_percentage_low = Int(default=10)
+    threshold_free_disk_percentage_high = Column(Integer, default=3)
+    threshold_free_disk_percentage_medium = Column(Integer, default=5)
+    threshold_free_disk_percentage_low = Column(Integer, default=10)
 
-    context_selector_type = Unicode(default=u'list')
+    context_selector_type = Column(String, default=u'list')
 
 
 class InternalTip_v_32(models.ModelWithID):
-    __storm_table__ = 'internaltip'
-    creation_date = DateTime(default_factory=datetime_now)
-    update_date = DateTime(default_factory=datetime_now)
+    __tablename__ = 'internaltip'
+    creation_date = Column(DATETIME, default=datetime_now)
+    update_date = Column(DATETIME, default=datetime_now)
 
-    context_id = Unicode()
+    context_id = Column(String)
 
-    questionnaire_hash = Unicode()
-    preview = JSON()
-    progressive = Int(default=0)
-    tor2web = Bool(default=False)
-    total_score = Int(default=0)
-    expiration_date = DateTime()
+    questionnaire_hash = Column(String)
+    preview = Column(JSON)
+    progressive = Column(Integer, default=0)
+    tor2web = Column(BOOLEAN, default=False)
+    total_score = Column(Integer, default=0)
+    expiration_date = Column(DATETIME)
 
-    identity_provided = Bool(default=False)
-    identity_provided_date = DateTime(default_factory=datetime_null)
+    identity_provided = Column(BOOLEAN, default=False)
+    identity_provided_date = Column(DATETIME, default=datetime_null)
 
-    enable_two_way_comments = Bool(default=True)
-    enable_two_way_messages = Bool(default=True)
-    enable_attachments = Bool(default=True)
-    enable_whistleblower_identity = Bool(default=False)
+    enable_two_way_comments = Column(BOOLEAN, default=True)
+    enable_two_way_messages = Column(BOOLEAN, default=True)
+    enable_attachments = Column(BOOLEAN, default=True)
+    enable_whistleblower_identity = Column(BOOLEAN, default=False)
 
-    new = Int(default=True)
+    new = Column(Integer, default=True)
 
 
 class WhistleblowerTip_v_32(models.ModelWithID):
-    __storm_table__ = 'whistleblowertip'
-    internaltip_id = Unicode()
-    receipt_hash = Unicode()
+    __tablename__ = 'whistleblowertip'
+    internaltip_id = Column(String)
+    receipt_hash = Column(String)
 
-    last_access = DateTime(default_factory=datetime_now)
-    access_counter = Int(default=0)
+    last_access = Column(DATETIME, default=datetime_now)
+    access_counter = Column(Integer, default=0)
 
 
 class User_v_32(models.ModelWithID):
-    __storm_table__ = 'user'
-    creation_date = DateTime(default_factory=datetime_now)
-    username = Unicode()
-    password = Unicode()
-    salt = Unicode()
-    deletable = Bool(default=True)
-    name = Unicode()
-    description = JSON()
-    public_name = Unicode()
-    role = Unicode()
-    state = Unicode()
-    last_login = DateTime(default_factory=datetime_null)
-    mail_address = Unicode()
-    language = Unicode()
-    timezone = Int()
-    password_change_needed = Bool(default=True)
-    password_change_date = DateTime(default_factory=datetime_null)
-    pgp_key_info = Unicode(default=u'')
-    pgp_key_fingerprint = Unicode(default=u'')
-    pgp_key_public = Unicode(default=u'')
-    pgp_key_expiration = DateTime(default_factory=datetime_null)
-    pgp_key_status = Unicode(default=u'disabled')
-    img_id = Unicode()
+    __tablename__ = 'user'
+    creation_date = Column(DATETIME, default=datetime_now)
+    username = Column(String)
+    password = Column(String)
+    salt = Column(String)
+    deletable = Column(BOOLEAN, default=True)
+    name = Column(String)
+    description = Column(JSON)
+    public_name = Column(String)
+    role = Column(String)
+    state = Column(String)
+    last_login = Column(DATETIME, default=datetime_null)
+    mail_address = Column(String)
+    language = Column(String)
+    timezone = Column(Integer)
+    password_change_needed = Column(BOOLEAN, default=True)
+    password_change_date = Column(DATETIME, default=datetime_null)
+    pgp_key_info = Column(String, default=u'')
+    pgp_key_fingerprint = Column(String, default=u'')
+    pgp_key_public = Column(String, default=u'')
+    pgp_key_expiration = Column(DATETIME, default=datetime_null)
+    pgp_key_status = Column(String, default=u'disabled')
+    img_id = Column(String)
 
 
 class MigrationScript(MigrationBase):
     def migrate_InternalTip(self):
-        old_objs = self.store_old.find(self.model_from['InternalTip'])
+        old_objs = self.store_old.query(self.model_from['InternalTip'])
         for old_obj in old_objs:
             new_obj = self.model_to['InternalTip']()
 
             old_wbtip_model = self.model_from['WhistleblowerTip']
-            old_wbtip = self.store_old.find(old_wbtip_model, old_wbtip_model.internaltip_id == old_obj.id).one()
+            old_wbtip = self.store_old.query(old_wbtip_model).filter(old_wbtip_model.internaltip_id == old_obj.id).one()
             if old_wbtip is None:
                 self.entries_count['InternalTip'] -= 1
                 continue
 
-            for _, v in new_obj._storm_columns.items():
-                if v.name == 'wb_last_access':
+            for key in [c.key for c in new_obj.__table__.columns]:
+                if key == 'wb_last_access':
                     if old_wbtip.last_access != datetime_null():
                         new_obj.wb_last_access = old_wbtip.last_access
                     else:
                         new_obj.last_access = old_obj.creation_date
                 else:
-                    setattr(new_obj, v.name, getattr(old_obj, v.name))
+                    setattr(new_obj, key, getattr(old_obj, key))
 
             self.store_new.add(new_obj)
 
     def migrate_Node(self):
-        old_node = self.store_old.find(self.model_from['Node']).one()
+        old_node = self.store_old.query(self.model_from['Node']).one()
         new_node = self.model_to['Node']()
 
-        for _, v in new_node._storm_columns.items():
-            if v.name not in ['tb_download_link', 'wbtip_timetolive']:
-                setattr(new_node, v.name, getattr(old_node, v.name))
+        for key in [c.key for c in new_node.__table__.columns]:
+            if key not in ['tb_download_link', 'wbtip_timetolive']:
+                setattr(new_node, key, getattr(old_node, key))
 
         self.store_new.add(new_node)

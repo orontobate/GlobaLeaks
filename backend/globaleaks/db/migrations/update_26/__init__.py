@@ -1,33 +1,30 @@
 # -*- coding: utf-8 -*-
-
-
-from storm.locals import Int, Unicode, DateTime
-
 from globaleaks.db.migrations.update import MigrationBase
 from globaleaks.models import ModelWithID
+from globaleaks.models.properties import *
 
 
 class InternalFile_v_25(ModelWithID):
-    __storm_table__ = 'internalfile'
-    creation_date = DateTime()
-    internaltip_id = Unicode()
-    name = Unicode()
-    file_path = Unicode()
-    content_type = Unicode()
-    size = Int()
-    new = Int()
-    processing_attempts = Int()
+    __tablename__ = 'internalfile'
+    creation_date = Column(DATETIME)
+    internaltip_id = Column(String)
+    name = Column(String)
+    file_path = Column(String)
+    content_type = Column(String)
+    size = Column(Integer)
+    new = Column(Integer)
+    processing_attempts = Column(Integer)
 
 
 class MigrationScript(MigrationBase):
     def migrate_InternalFile(self):
-        old_objs = self.store_old.find(self.model_from['InternalFile'])
+        old_objs = self.store_old.query(self.model_from['InternalFile'])
         for old_obj in old_objs:
             new_obj = self.model_to['InternalFile']()
-            for _, v in new_obj._storm_columns.items():
-                if v.name == 'submission':
+            for key in [c.key for c in new_obj.__table__.columns]:
+                if key == 'submission':
                     new_obj.submission = True
                 else:
-                    setattr(new_obj, v.name, getattr(old_obj, v.name))
+                    setattr(new_obj, key, getattr(old_obj, key))
 
             self.store_new.add(new_obj)

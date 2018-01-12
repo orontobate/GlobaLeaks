@@ -2,56 +2,48 @@
 import os
 import shutil
 
-from storm.expr import And
-from storm.locals import Bool, Int, Reference, ReferenceSet, Unicode, Storm, JSON
-
 from globaleaks.db.migrations.update import MigrationBase
+from globaleaks.db.migrations.update_37.config_desc import GLConfig
 from globaleaks.handlers.admin import tenant
 from globaleaks.models import *
+from globaleaks.models import config_desc
+from globaleaks.models.properties import *
 from globaleaks.settings import Settings
 from globaleaks.utils.utility import datetime_now, uuid4
 
-from globaleaks.models import config_desc
-from globaleaks.db.migrations.update_37.config_desc import GLConfig
-
-ROOT_TENANT = 1
-
 
 class Anomalies_v_38(ModelWithID):
-    __storm_table__= 'anomalies'
-    date = DateTime()
-    alarm = Int()
-    events = JSON()
+    __tablename__ = 'anomalies'
+    date = Column(DATETIME)
+    alarm = Column(Integer)
+    events = Column(JSON)
 
 
 class ArchivedSchema_v_38(Model):
-    __storm_table__ = 'archivedschema'
-    __storm_primary__ = 'hash', 'type'
-
-    hash = Unicode()
-    type = Unicode()
-    schema = JSON()
+    __tablename__ = 'archivedschema'
+    hash = Column(String, primary_key=True)
+    type = Column(String, primary_key=True)
+    schema = Column(JSON)
 
 
 class Comment_v_38(ModelWithID):
-    __storm_table__ = 'comment'
-    creation_date = DateTime(default_factory=datetime_now)
-    internaltip_id = Unicode()
-    author_id = Unicode()
-    content = Unicode()
-    type = Unicode()
-    new = Int(default=True)
+    __tablename__ = 'comment'
+    creation_date = Column(DATETIME, default=datetime_now)
+    internaltip_id = Column(String)
+    author_id = Column(String)
+    content = Column(String)
+    type = Column(String)
+    new = Column(Integer, default=True)
 
 
-class Config_v_38(Storm):
-    __storm_table__ = 'config'
-    __storm_primary__ = ('var_group', 'var_name')
+class Config_v_38(Model):
+    __tablename__ = 'config'
 
     cfg_desc = GLConfig
-    var_group = Unicode()
-    var_name = Unicode()
-    value = JSON()
-    customized = Bool(default=False)
+    var_group = Column(String, primary_key=True)
+    var_name = Column(String, primary_key=True)
+    value = Column(JSON)
+    customized = Column(BOOLEAN, default=False)
 
     def __init__(self, group=None, name=None, value=None, cfg_desc=None, migrate=False):
         if cfg_desc is not None:
@@ -96,15 +88,14 @@ class Config_v_38(Storm):
         return "<Config: %s.%s>" % (self.var_group, self.var_name)
 
 
-class ConfigL10N_v_38(Storm):
-    __storm_table__ = 'config_l10n'
-    __storm_primary__ = ('lang', 'var_group', 'var_name')
+class ConfigL10N_v_38(Model):
+    __tablename__ = 'config_l10n'
 
-    lang = Unicode()
-    var_group = Unicode()
-    var_name = Unicode()
-    value = Unicode()
-    customized = Bool(default=False)
+    lang = Column(String, primary_key=True)
+    var_group = Column(String, primary_key=True)
+    var_name = Column(String, primary_key=True)
+    value = Column(String)
+    customized = Column(BOOLEAN, default=False)
 
     def __init__(self, lang_code=None, group=None, var_name=None, value='', migrate=False):
         if migrate:
@@ -124,49 +115,49 @@ class ConfigL10N_v_38(Storm):
 
 
 class Context_v_38(ModelWithID):
-    __storm_table__ = 'context'
+    __tablename__ = 'context'
 
-    show_small_receiver_cards = Bool(default=False)
-    show_context = Bool(default=True)
-    show_recipients_details = Bool(default=False)
-    allow_recipients_selection = Bool(default=False)
-    maximum_selectable_receivers = Int(default=0)
-    select_all_receivers = Bool(default=True)
-    enable_comments = Bool(default=True)
-    enable_messages = Bool(default=False)
-    enable_two_way_comments = Bool(default=True)
-    enable_two_way_messages = Bool(default=True)
-    enable_attachments = Bool(default=True)
-    enable_rc_to_wb_files = Bool(default=False)
-    tip_timetolive = Int(default=15)
-    name = JSON()
-    description = JSON()
-    recipients_clarification = JSON()
-    status_page_message = JSON()
-    show_receivers_in_alphabetical_order = Bool(default=False)
-    presentation_order = Int(default=0)
-    questionnaire_id = Unicode()
-    img_id = Unicode()
+    show_small_receiver_cards = Column(BOOLEAN, default=False)
+    show_context = Column(BOOLEAN, default=True)
+    show_recipients_details = Column(BOOLEAN, default=False)
+    allow_recipients_selection = Column(BOOLEAN, default=False)
+    maximum_selectable_receivers = Column(Integer, default=0)
+    select_all_receivers = Column(BOOLEAN, default=True)
+    enable_comments = Column(BOOLEAN, default=True)
+    enable_messages = Column(BOOLEAN, default=False)
+    enable_two_way_comments = Column(BOOLEAN, default=True)
+    enable_two_way_messages = Column(BOOLEAN, default=True)
+    enable_attachments = Column(BOOLEAN, default=True)
+    enable_rc_to_wb_files = Column(BOOLEAN, default=False)
+    tip_timetolive = Column(Integer, default=15)
+    name = Column(JSON)
+    description = Column(JSON)
+    recipients_clarification = Column(JSON)
+    status_page_message = Column(JSON)
+    show_receivers_in_alphabetical_order = Column(BOOLEAN, default=False)
+    presentation_order = Column(Integer, default=0)
+    questionnaire_id = Column(String)
+    img_id = Column(String)
 
 class CustomTexts_v_38(Model):
-    __storm_table__ = 'customtexts'
+    __tablename__ = 'customtexts'
 
-    lang = Unicode(primary=True)
-    texts = JSON()
+    lang = Column(String, primary_key=True)
+    texts = Column(JSON)
 
 
 class Counter_v_38(Model):
-    __storm_table__ = 'counter'
+    __tablename__ = 'counter'
 
-    key = Unicode(primary=True)
-    counter = Int(default=1)
-    update_date = DateTime(default_factory=datetime_now)
+    key = Column(String, primary_key=True)
+    counter = Column(Integer, default=1)
+    update_date = Column(DATETIME, default=datetime_now)
 
 
 class EnabledLanguage_v_38(Model):
-    __storm_table__ = 'enabledlanguage'
+    __tablename__ = 'enabledlanguage'
 
-    name = Unicode(primary=True)
+    name = Column(String, primary_key=True)
 
     def __init__(self, name=None, migrate=False):
         if migrate:
@@ -175,39 +166,39 @@ class EnabledLanguage_v_38(Model):
         self.name = unicode(name)
 
     @classmethod
-    def list(cls, store):
-        return [name for name in store.find(cls.name)]
+    def list(cls, session):
+        return [name for name in session.query(cls.name)]
 
 
 class Field_v_38(ModelWithID):
-    __storm_table__ = 'field'
+    __tablename__ = 'field'
 
-    x = Int(default=0)
-    y = Int(default=0)
-    width = Int(default=0)
-    label = JSON()
-    description = JSON()
-    hint = JSON()
-    required = Bool(default=False)
-    preview = Bool(default=False)
-    multi_entry = Bool(default=False)
-    multi_entry_hint = JSON()
-    stats_enabled = Bool(default=False)
-    triggered_by_score = Int(default=0)
-    fieldgroup_id = Unicode()
-    step_id = Unicode()
-    template_id = Unicode()
-    type = Unicode(default=u'inputbox')
-    instance = Unicode(default=u'instance')
-    editable = Bool(default=True)
+    x = Column(Integer, default=0)
+    y = Column(Integer, default=0)
+    width = Column(Integer, default=0)
+    label = Column(JSON)
+    description = Column(JSON)
+    hint = Column(JSON)
+    required = Column(BOOLEAN, default=False)
+    preview = Column(BOOLEAN, default=False)
+    multi_entry = Column(BOOLEAN, default=False)
+    multi_entry_hint = Column(JSON)
+    stats_enabled = Column(BOOLEAN, default=False)
+    triggered_by_score = Column(Integer, default=0)
+    fieldgroup_id = Column(String)
+    step_id = Column(String)
+    template_id = Column(String)
+    type = Column(String, default=u'inputbox')
+    instance = Column(String, default=u'instance')
+    editable = Column(BOOLEAN, default=True)
 
 
 class FieldAttr_v_38(ModelWithID):
-    __storm_table__ = 'fieldattr'
-    field_id = Unicode()
-    name = Unicode()
-    type = Unicode()
-    value = JSON()
+    __tablename__ = 'fieldattr'
+    field_id = Column(String)
+    name = Column(String)
+    type = Column(String)
+    value = Column(JSON)
 
     def update(self, values=None):
         """
@@ -231,270 +222,270 @@ class FieldAttr_v_38(ModelWithID):
 
 
 class FieldOption_v_38(ModelWithID):
-    __storm_table__ = 'fieldoption'
-    field_id = Unicode()
-    presentation_order = Int(default=0)
-    label = JSON()
-    score_points = Int(default=0)
-    trigger_field = Unicode()
-    trigger_step = Unicode()
+    __tablename__ = 'fieldoption'
+    field_id = Column(String)
+    presentation_order = Column(Integer, default=0)
+    label = Column(JSON)
+    score_points = Column(Integer, default=0)
+    trigger_field = Column(String)
+    trigger_step = Column(String)
 
 
 class FieldAnswer_v_38(ModelWithID):
-    __storm_table__ = 'fieldanswer'
+    __tablename__ = 'fieldanswer'
 
-    internaltip_id = Unicode()
-    fieldanswergroup_id = Unicode()
-    key = Unicode(default=u'')
-    is_leaf = Bool(default=True)
-    value = Unicode(default=u'')
+    internaltip_id = Column(String)
+    fieldanswergroup_id = Column(String)
+    key = Column(String, default=u'')
+    is_leaf = Column(BOOLEAN, default=True)
+    value = Column(String, default=u'')
 
 
 class FieldAnswerGroup_v_38(ModelWithID):
-    __storm_table__ = 'fieldanswergroup'
+    __tablename__ = 'fieldanswergroup'
 
-    number = Int(default=0)
-    fieldanswer_id = Unicode()
+    number = Column(Integer, default=0)
+    fieldanswer_id = Column(String)
 
 
 class File_v_38(ModelWithID):
-    __storm_table__ = 'file'
+    __tablename__ = 'file'
 
-    data = Unicode()
+    data = Column(String)
 
 
 class InternalFile_v_38(ModelWithID):
-    __storm_table__ = 'internalfile'
+    __tablename__ = 'internalfile'
 
-    creation_date = DateTime(default_factory=datetime_now)
-    internaltip_id = Unicode()
-    name = Unicode()
-    file_path = Unicode()
-    content_type = Unicode()
-    size = Int()
-    new = Int(default=True)
-    submission = Int(default = False)
-    processing_attempts = Int(default=0)
+    creation_date = Column(DATETIME, default=datetime_now)
+    internaltip_id = Column(String)
+    name = Column(String)
+    file_path = Column(String)
+    content_type = Column(String)
+    size = Column(Integer)
+    new = Column(Integer, default=True)
+    submission = Column(Integer, default = False)
+    processing_attempts = Column(Integer, default=0)
 
 
 class InternalTip_v_38(ModelWithID):
-    __storm_table__ = 'internaltip'
+    __tablename__ = 'internaltip'
 
-    creation_date = DateTime(default_factory=datetime_now)
-    update_date = DateTime(default_factory=datetime_now)
-    context_id = Unicode()
-    questionnaire_hash = Unicode()
-    preview = JSON()
-    progressive = Int(default=0)
-    tor2web = Bool(default=False)
-    total_score = Int(default=0)
-    expiration_date = DateTime()
-    identity_provided = Bool(default=False)
-    identity_provided_date = DateTime(default_factory=datetime_null)
-    enable_two_way_comments = Bool(default=True)
-    enable_two_way_messages = Bool(default=True)
-    enable_attachments = Bool(default=True)
-    enable_whistleblower_identity = Bool(default=False)
-    wb_last_access = DateTime(default_factory=datetime_now)
-    wb_access_counter = Int(default=0)
+    creation_date = Column(DATETIME, default=datetime_now)
+    update_date = Column(DATETIME, default=datetime_now)
+    context_id = Column(String)
+    questionnaire_hash = Column(String)
+    preview = Column(JSON)
+    progressive = Column(Integer, default=0)
+    tor2web = Column(BOOLEAN, default=False)
+    total_score = Column(Integer, default=0)
+    expiration_date = Column(DATETIME)
+    identity_provided = Column(BOOLEAN, default=False)
+    identity_provided_date = Column(DATETIME, default=datetime_null)
+    enable_two_way_comments = Column(BOOLEAN, default=True)
+    enable_two_way_messages = Column(BOOLEAN, default=True)
+    enable_attachments = Column(BOOLEAN, default=True)
+    enable_whistleblower_identity = Column(BOOLEAN, default=False)
+    wb_last_access = Column(DATETIME, default=datetime_now)
+    wb_access_counter = Column(Integer, default=0)
 
 
 class Mail_v_38(ModelWithID):
-    __storm_table__ = 'mail'
+    __tablename__ = 'mail'
 
-    creation_date = DateTime(default_factory=datetime_now)
-    address = Unicode()
-    subject = Unicode()
-    body = Unicode()
-    processing_attempts = Int(default=0)
+    creation_date = Column(DATETIME, default=datetime_now)
+    address = Column(String)
+    subject = Column(String)
+    body = Column(String)
+    processing_attempts = Column(Integer, default=0)
 
 
 class ReceiverTip_v_38(ModelWithID):
-    __storm_table__ = 'receivertip'
+    __tablename__ = 'receivertip'
 
-    internaltip_id = Unicode()
-    receiver_id = Unicode()
-    last_access = DateTime(default_factory=datetime_null)
-    access_counter = Int(default=0)
-    label = Unicode(default=u'')
-    can_access_whistleblower_identity = Bool(default=False)
-    new = Int(default=True)
-    enable_notifications = Bool(default=True)
+    internaltip_id = Column(String)
+    receiver_id = Column(String)
+    last_access = Column(DATETIME, default=datetime_null)
+    access_counter = Column(Integer, default=0)
+    label = Column(String, default=u'')
+    can_access_whistleblower_identity = Column(BOOLEAN, default=False)
+    new = Column(Integer, default=True)
+    enable_notifications = Column(BOOLEAN, default=True)
 
 
 class Receiver_v_38(ModelWithID):
-    __storm_table__ = 'receiver'
+    __tablename__ = 'receiver'
 
-    configuration = Unicode(default=u'default')
-    can_delete_submission = Bool(default=False)
-    can_postpone_expiration = Bool(default=False)
-    can_grant_permissions = Bool(default=False)
-    tip_notification = Bool(default=True)
-    presentation_order = Int(default=0)
+    configuration = Column(String, default=u'default')
+    can_delete_submission = Column(BOOLEAN, default=False)
+    can_postpone_expiration = Column(BOOLEAN, default=False)
+    can_grant_permissions = Column(BOOLEAN, default=False)
+    tip_notification = Column(BOOLEAN, default=True)
+    presentation_order = Column(Integer, default=0)
 
 
 class ReceiverContext_v_38(Model):
-    __storm_table__ = 'receiver_context'
-    __storm_primary__ = 'context_id', 'receiver_id'
+    __tablename__ = 'receiver_context'
 
-    context_id = Unicode()
-    receiver_id = Unicode()
+    context_id = Column(String, primary_key=True)
+    receiver_id = Column(String, primary_key=True)
 
 
 class ReceiverFile_v_38(ModelWithID):
-    __storm_table__ = 'receiverfile'
+    __tablename__ = 'receiverfile'
 
-    internalfile_id = Unicode()
-    receivertip_id = Unicode()
-    file_path = Unicode()
-    size = Int()
-    downloads = Int(default=0)
-    last_access = DateTime(default_factory=datetime_null)
-    new = Int(default=True)
-    status = Unicode()
+    internalfile_id = Column(String)
+    receivertip_id = Column(String)
+    file_path = Column(String)
+    size = Column(Integer)
+    downloads = Column(Integer, default=0)
+    last_access = Column(DATETIME, default=datetime_null)
+    new = Column(Integer, default=True)
+    status = Column(String)
 
 
 class ShortURL_v_38(ModelWithID):
-    __storm_table__ = 'shorturl'
+    __tablename__ = 'shorturl'
 
-    shorturl = Unicode()
-    longurl = Unicode()
+    shorturl = Column(String)
+    longurl = Column(String)
 
 
 class Stats_v_38(ModelWithID):
-    __storm_table__ = 'stats'
+    __tablename__ = 'stats'
 
-    start = DateTime()
-    summary = JSON()
-    free_disk_space = Int()
+    start = Column(DATETIME)
+    summary = Column(JSON)
+    free_disk_space = Column(Integer)
 
 
 class Step_v_38(ModelWithID):
-    __storm_table__ = 'step'
-    questionnaire_id = Unicode()
-    label = JSON()
-    description = JSON()
-    presentation_order = Int(default=0)
-    triggered_by_score = Int(default=0)
+    __tablename__ = 'step'
+    questionnaire_id = Column(String)
+    label = Column(JSON)
+    description = Column(JSON)
+    presentation_order = Column(Integer, default=0)
+    triggered_by_score = Column(Integer, default=0)
 
 
 class IdentityAccessRequest_v_38(ModelWithID):
-    __storm_table__ = 'identityaccessrequest'
+    __tablename__ = 'identityaccessrequest'
 
-    receivertip_id = Unicode()
-    request_date = DateTime(default_factory=datetime_now)
-    request_motivation = Unicode(default=u'')
-    reply_date = DateTime(default_factory=datetime_null)
-    reply_user_id = Unicode()
-    reply_motivation = Unicode(default=u'')
-    reply = Unicode(default=u'pending')
+    receivertip_id = Column(String)
+    request_date = Column(DATETIME, default=datetime_now)
+    request_motivation = Column(String, default=u'')
+    reply_date = Column(DATETIME, default=datetime_null)
+    reply_user_id = Column(String)
+    reply_motivation = Column(String, default=u'')
+    reply = Column(String, default=u'pending')
 
 
 class Message_v_38(ModelWithID):
-    __storm_table__ = 'message'
-    creation_date = DateTime(default_factory=datetime_now)
-    receivertip_id = Unicode()
-    content = Unicode()
-    type = Unicode()
-    new = Int(default=True)
+    __tablename__ = 'message'
+    creation_date = Column(DATETIME, default=datetime_now)
+    receivertip_id = Column(String)
+    content = Column(String)
+    type = Column(String)
+    new = Column(Integer, default=True)
 
 
 class Questionnaire_v_38(ModelWithID):
-    __storm_table__ = 'questionnaire'
+    __tablename__ = 'questionnaire'
 
-    name = Unicode()
-    show_steps_navigation_bar = Bool(default=False)
-    steps_navigation_requires_completion = Bool(default=False)
-    enable_whistleblower_identity = Bool(default=False)
-    editable = Bool(default=True)
+    name = Column(String)
+    show_steps_navigation_bar = Column(BOOLEAN, default=False)
+    steps_navigation_requires_completion = Column(BOOLEAN, default=False)
+    enable_whistleblower_identity = Column(BOOLEAN, default=False)
+    editable = Column(BOOLEAN, default=True)
 
 
 class User_v_38(ModelWithID):
-    __storm_table__ = 'user'
+    __tablename__ = 'user'
 
-    creation_date = DateTime(default_factory=datetime_now)
-    username = Unicode(default=u'')
-    password = Unicode(default=u'')
-    salt = Unicode()
-    deletable = Bool(default=True)
-    name = Unicode(default=u'')
-    description = JSON(default_factory=dict)
-    public_name = Unicode(default=u'')
-    role = Unicode(default=u'receiver')
-    state = Unicode(default=u'enabled')
-    last_login = DateTime(default_factory=datetime_null)
-    mail_address = Unicode(default=u'')
-    language = Unicode()
-    password_change_needed = Bool(default=True)
-    password_change_date = DateTime(default_factory=datetime_null)
-    pgp_key_fingerprint = Unicode(default=u'')
-    pgp_key_public = Unicode(default=u'')
-    pgp_key_expiration = DateTime(default_factory=datetime_null)
-    img_id = Unicode()
+    creation_date = Column(DATETIME, default=datetime_now)
+    username = Column(String, default=u'')
+    password = Column(String, default=u'')
+    salt = Column(String)
+    deletable = Column(BOOLEAN, default=True)
+    name = Column(String, default=u'')
+    description = Column(JSON, default=dict)
+    public_name = Column(String, default=u'')
+    role = Column(String, default=u'receiver')
+    state = Column(String, default=u'enabled')
+    last_login = Column(DATETIME, default=datetime_null)
+    mail_address = Column(String, default=u'')
+    language = Column(String)
+    password_change_needed = Column(BOOLEAN, default=True)
+    password_change_date = Column(DATETIME, default=datetime_null)
+    pgp_key_fingerprint = Column(String, default=u'')
+    pgp_key_public = Column(String, default=u'')
+    pgp_key_expiration = Column(DATETIME, default=datetime_null)
+    img_id = Column(String)
 
 
 class WhistleblowerTip_v_38(ModelWithID):
-    __storm_table__ = 'whistleblowertip'
+    __tablename__ = 'whistleblowertip'
 
-    receipt_hash = Unicode()
+    receipt_hash = Column(String)
 
 
 class WhistleblowerFile_v_38(ModelWithID):
-    __storm_table__ = 'whistleblowerfile'
+    __tablename__ = 'whistleblowerfile'
 
-    receivertip_id = Unicode()
-    name = Unicode()
-    file_path = Unicode()
-    size = Int()
-    content_type = Unicode()
-    downloads = Int(default=0)
-    creation_date = DateTime(default_factory=datetime_now)
-    last_access = DateTime(default_factory=datetime_null)
-    description = Unicode()
+    receivertip_id = Column(String)
+    name = Column(String)
+    file_path = Column(String)
+    size = Column(Integer)
+    content_type = Column(String)
+    downloads = Column(Integer, default=0)
+    creation_date = Column(DATETIME, default=datetime_now)
+    last_access = Column(DATETIME, default=datetime_null)
+    description = Column(String)
 
 
 class MigrationScript(MigrationBase):
     def migrate_InternalTip(self):
         used_presentation_order = []
-        old_objs = self.store_old.find(self.model_from['InternalTip'])
+        old_objs = self.store_old.query(self.model_from['InternalTip'])
         for old_obj in old_objs:
             new_obj = self.model_to['InternalTip']()
-            for _, v in new_obj._storm_columns.iteritems():
-                if v.name == 'tid':
+            for key in [c.key for c in new_obj.__table__.columns]:
+                if key == 'tid':
                     new_obj.tid = 1
-                elif v.name == 'receipt_hash':
-                    wbtip = self.store_old.find(self.model_from['WhistleblowerTip'], id=old_obj.id).one()
+                elif key == 'receipt_hash':
+                    wbtip = self.store_old.query(self.model_from['WhistleblowerTip']).filter(self.model_from['WhistleblowerTip'].id == old_obj.id).one()
                     new_obj.receipt_hash = wbtip.receipt_hash if wbtip is not None else u''
                 else:
-                    setattr(new_obj, v.name, getattr(old_obj, v.name))
+                    setattr(new_obj, key, getattr(old_obj, key))
 
             self.store_new.add(new_obj)
 
     def migrate_ReceiverContext(self):
+        model_from = self.model_from['Receiver']
         used_presentation_order = []
-        old_objs = self.store_old.find(self.model_from['ReceiverContext'])
+        old_objs = self.store_old.query(self.model_from['ReceiverContext'])
         for old_obj in old_objs:
             new_obj = self.model_to['ReceiverContext']()
-            for _, v in new_obj._storm_columns.iteritems():
-                if v.name == 'tid':
-                    new_obj.tid = ROOT_TENANT
-                elif v.name == 'presentation_order':
-                    presentation_order = self.store_old.find(self.model_from['Receiver'], id=old_obj.receiver_id).one().presentation_order
+            for key in [c.key for c in new_obj.__table__.columns]:
+                if key == 'tid':
+                    new_obj.tid = 1
+                elif key == 'presentation_order':
+                    presentation_order = self.store_old.query(model_from).filter(model_from.id == old_obj.receiver_id).one().presentation_order
                     while presentation_order in used_presentation_order:
                         presentation_order += 1
 
                     used_presentation_order.append(presentation_order)
                     new_obj.presentation_order = presentation_order
                 else:
-                    setattr(new_obj, v.name, getattr(old_obj, v.name))
+                    setattr(new_obj, key, getattr(old_obj, key))
 
             self.store_new.add(new_obj)
 
     def migrate_File(self):
-        old_objs = self.store_old.find(self.model_from['File'])
+        old_objs = self.store_old.query(self.model_from['File'])
         for old_obj in old_objs:
-            u = self.store_old.find(self.model_from['User'], img_id=old_obj.id).one()
-            c = self.store_old.find(self.model_from['Context'], img_id=old_obj.id).one()
+            u = self.store_old.query(self.model_from['User']).filter(self.model_from['User'].img_id == old_obj.id).one_or_none()
+            c = self.store_old.query(self.model_from['Context']).filter(self.model_from['User'].img_id == old_obj.id).one_or_none()
             if u is not None:
                 new_obj = self.model_to['UserImg']()
                 new_obj.id = u.id
@@ -508,32 +499,32 @@ class MigrationScript(MigrationBase):
             else:
                 new_obj = self.model_to['File']()
 
-            for _, v in new_obj._storm_columns.iteritems():
-                if v.name == 'tid':
-                    new_obj.tid = ROOT_TENANT
-                elif v.name == 'name':
+            for key in [c.key for c in new_obj.__table__.columns]:
+                if key == 'tid':
+                    new_obj.tid = 1
+                elif key == 'name':
                     new_obj.name = ''
                 else:
-                    setattr(new_obj, v.name, getattr(old_obj, v.name))
+                    setattr(new_obj, key, getattr(old_obj, key))
 
             self.store_new.add(new_obj)
 
     def migrate_File_XXX(self, XXX):
-        old_objs = self.store_old.find(self.model_from[XXX])
+        old_objs = self.store_old.query(self.model_from[XXX])
         for old_obj in old_objs:
             new_obj = self.model_to[XXX]()
 
-            for _, v in new_obj._storm_columns.iteritems():
-                if v.name == 'tid':
-                    new_obj.tid = ROOT_TENANT
-                elif v.name == 'file_path':
+            for key in [c.key for c in new_obj.__table__.columns]:
+                if key == 'tid':
+                    new_obj.tid = 1
+                elif key == 'file_path':
                     new_obj.file_path = old_obj.file_path.replace('files/submission', 'attachments')
                     try:
                         shutil.move(old_obj.file_path, new_obj.file_path)
                     except:
                         pass
                 else:
-                    setattr(new_obj, v.name, getattr(old_obj, v.name))
+                    setattr(new_obj, key, getattr(old_obj, key))
 
             self.store_new.add(new_obj)
 

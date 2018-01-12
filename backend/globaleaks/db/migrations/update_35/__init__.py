@@ -1,71 +1,69 @@
 # -*- coding: utf-8
-from storm.locals import Int, Bool, Unicode, DateTime, JSON
-
 from globaleaks import models
 from globaleaks.db.migrations.update import MigrationBase
+from globaleaks.models.properties import *
 from globaleaks.settings import Settings
 from globaleaks.utils.utility import datetime_now, datetime_null
 
 
 class Context_v_34(models.ModelWithID):
-    __storm_table__ = 'context'
-    show_small_receiver_cards = Bool(default=False)
-    show_context = Bool(default=True)
-    show_recipients_details = Bool(default=False)
-    allow_recipients_selection = Bool(default=False)
-    maximum_selectable_receivers = Int(default=0)
-    select_all_receivers = Bool(default=True)
-    enable_comments = Bool(default=True)
-    enable_messages = Bool(default=False)
-    enable_two_way_comments = Bool(default=True)
-    enable_two_way_messages = Bool(default=True)
-    enable_attachments = Bool(default=True)
-    tip_timetolive = Int(default=15)
-    name = JSON()
-    description = JSON()
-    recipients_clarification = JSON()
-    status_page_message = JSON()
-    show_receivers_in_alphabetical_order = Bool(default=False)
-    presentation_order = Int(default=0)
-    questionnaire_id = Unicode()
-    img_id = Unicode()
+    __tablename__ = 'context'
+    show_small_receiver_cards = Column(BOOLEAN, default=False)
+    show_context = Column(BOOLEAN, default=True)
+    show_recipients_details = Column(BOOLEAN, default=False)
+    allow_recipients_selection = Column(BOOLEAN, default=False)
+    maximum_selectable_receivers = Column(Integer, default=0)
+    select_all_receivers = Column(BOOLEAN, default=True)
+    enable_comments = Column(BOOLEAN, default=True)
+    enable_messages = Column(BOOLEAN, default=False)
+    enable_two_way_comments = Column(BOOLEAN, default=True)
+    enable_two_way_messages = Column(BOOLEAN, default=True)
+    enable_attachments = Column(BOOLEAN, default=True)
+    tip_timetolive = Column(Integer, default=15)
+    name = Column(JSON)
+    description = Column(JSON)
+    recipients_clarification = Column(JSON)
+    status_page_message = Column(JSON)
+    show_receivers_in_alphabetical_order = Column(BOOLEAN, default=False)
+    presentation_order = Column(Integer, default=0)
+    questionnaire_id = Column(String)
+    img_id = Column(String)
 
 
 class WhistleblowerTip_v_34(models.ModelWithID):
-    __storm_table__ = 'whistleblowertip'
-    internaltip_id = Unicode()
-    receipt_hash = Unicode()
-    access_counter = Int(default=0)
+    __tablename__ = 'whistleblowertip'
+    internaltip_id = Column(String)
+    receipt_hash = Column(String)
+    access_counter = Column(Integer, default=0)
 
 
 class InternalTip_v_34(models.ModelWithID):
-    __storm_table__ = 'internaltip'
-    creation_date = DateTime(default_factory=datetime_now)
-    update_date = DateTime(default_factory=datetime_now)
-    context_id = Unicode()
-    questionnaire_hash = Unicode()
-    preview = JSON()
-    progressive = Int(default=0)
-    tor2web = Bool(default=False)
-    total_score = Int(default=0)
-    expiration_date = DateTime()
-    identity_provided = Bool(default=False)
-    identity_provided_date = DateTime(default_factory=datetime_null)
-    enable_two_way_comments = Bool(default=True)
-    enable_two_way_messages = Bool(default=True)
-    enable_attachments = Bool(default=True)
-    enable_whistleblower_identity = Bool(default=False)
-    wb_last_access = DateTime(default_factory=datetime_now)
+    __tablename__ = 'internaltip'
+    creation_date = Column(DATETIME, default=datetime_now)
+    update_date = Column(DATETIME, default=datetime_now)
+    context_id = Column(String)
+    questionnaire_hash = Column(String)
+    preview = Column(JSON)
+    progressive = Column(Integer, default=0)
+    tor2web = Column(BOOLEAN, default=False)
+    total_score = Column(Integer, default=0)
+    expiration_date = Column(DATETIME)
+    identity_provided = Column(BOOLEAN, default=False)
+    identity_provided_date = Column(DATETIME, default=datetime_null)
+    enable_two_way_comments = Column(BOOLEAN, default=True)
+    enable_two_way_messages = Column(BOOLEAN, default=True)
+    enable_attachments = Column(BOOLEAN, default=True)
+    enable_whistleblower_identity = Column(BOOLEAN, default=False)
+    wb_last_access = Column(DATETIME, default=datetime_now)
 
 class MigrationScript(MigrationBase):
     def migrate_Context(self):
-        old_objs = self.store_old.find(self.model_from['Context'])
+        old_objs = self.store_old.query(self.model_from['Context'])
         for old_obj in old_objs:
             new_obj = self.model_to['Context']()
-            for _, v in new_obj._storm_columns.items():
-                if v.name == 'tip_timetolive':
-                    # NOTE hardcoded policy. . . .
-                    tip_ttl = 5*365
+            for key in [c.key for c in new_obj.__table__.columns]:
+                if key == 'tip_timetolive':
+                    tip_ttl = 5 * 365
                     if old_obj.tip_timetolive > tip_ttl:
                         Settings.print_msg('[WARNING] Found an expiration date longer than 5 years! Configuring tips to never expire.')
                         # If data retention was larger than 5 years the intended goal was
@@ -78,52 +76,52 @@ class MigrationScript(MigrationBase):
                         new_obj.tip_timetolive = old_obj.tip_timetolive
                     continue
 
-                elif v.name == 'enable_rc_to_wb_files':
+                elif key == 'enable_rc_to_wb_files':
                     new_obj.enable_rc_to_wb_files = False
 
                 else:
-                    setattr(new_obj, v.name, getattr(old_obj, v.name))
+                    setattr(new_obj, key, getattr(old_obj, key))
 
             self.store_new.add(new_obj)
 
     def migrate_User(self):
-        default_language = self.store_new.find(self.model_to['Config'], var_name=u'default_language').one().value['v']
-        enabled_languages = [lang_name for lang_name in self.store_old.find(self.model_to['EnabledLanguage'].name)]
+        default_language = self.store_new.query(self.model_to['Config']).filter(self.model_to['Config'].var_name == u'default_language').one().value['v']
+        enabled_languages = [r[0] for r in self.store_old.query(self.model_to['EnabledLanguage'].name)]
 
-        old_objs = self.store_old.find(self.model_from['User'])
+        old_objs = self.store_old.query(self.model_from['User'])
         for old_obj in old_objs:
             new_obj = self.model_to['User']()
-            for _, v in new_obj._storm_columns.items():
-                if v.name in ['pgp_key_public', 'pgp_key_fingerprint'] and getattr(old_obj, v.name) is None:
-                    setattr(new_obj, v.name, '')
+            for key in [c.key for c in new_obj.__table__.columns]:
+                if key in ['pgp_key_public', 'pgp_key_fingerprint'] and getattr(old_obj, key) is None:
+                    setattr(new_obj, key, '')
 
-                elif v.name in ['pgp_key_expiration'] and getattr(old_obj, v.name) is None:
-                    setattr(new_obj, v.name, datetime_null())
+                elif key in ['pgp_key_expiration'] and getattr(old_obj, key) is None:
+                    setattr(new_obj, key, datetime_null())
 
-                elif v.name == 'language' and getattr(old_obj, v.name) not in enabled_languages:
+                elif key == 'language' and getattr(old_obj, key) not in enabled_languages:
                     # fix users that have configured a language that has never been there
-                    setattr(new_obj, v.name, default_language)
+                    setattr(new_obj, key, default_language)
 
                 else:
-                    setattr(new_obj, v.name, getattr(old_obj, v.name))
+                    setattr(new_obj, key, getattr(old_obj, key))
 
             self.store_new.add(new_obj)
 
     def migrate_WhistleblowerTip(self):
-        old_objs = self.store_old.find(self.model_from['WhistleblowerTip'])
+        old_objs = self.store_old.query(self.model_from['WhistleblowerTip'])
         for old_obj in old_objs:
             new_obj = self.model_to['WhistleblowerTip']()
-            for _, v in new_obj._storm_columns.items():
-                if v.name == 'id':
+            for key in [c.key for c in new_obj.__table__.columns]:
+                if key == 'id':
                     new_obj.id = old_obj.internaltip_id
                     continue
 
-                setattr(new_obj, v.name, getattr(old_obj, v.name))
+                setattr(new_obj, key, getattr(old_obj, key))
 
             self.store_new.add(new_obj)
 
     def epilogue(self):
-        c = self.store_new.find(self.model_to['Config'], var_name=u'wbtip_timetolive').one()
+        c = self.store_new.query(self.model_to['Config']).filter(self.model_to['Config'].var_name == u'wbtip_timetolive').one()
         if int(c.value['v']) < 5:
             c.value['v'] = 90
         elif int(c.value['v']) > 365 * 2:

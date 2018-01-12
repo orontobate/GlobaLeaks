@@ -1,33 +1,37 @@
-# -*- coding: utf-8
 """
 ORM Models definitions.
 """
 from __future__ import absolute_import
 
-from datetime import timedelta
-from storm.locals import Bool, Int, Unicode, Storm, JSON
+import collections
 
+from datetime import timedelta
+
+from globaleaks.models.properties import *
 from globaleaks.orm import transact
 from globaleaks.rest import errors
 from globaleaks.settings import Settings
 from globaleaks.utils.utility import datetime_now, datetime_null, datetime_to_ISO8601, uuid4
 
-from .properties import MetaModel, DateTime
 
-
-def db_forge_obj(store, mock_class, mock_fields):
+def db_forge_obj(session, mock_class, mock_fields):
     obj = mock_class(mock_fields)
-    store.add(obj)
+    session.add(obj)
+    session.flush()
     return obj
 
 
 @transact
-def forge_obj(store, mock_class, mock_fields):
-    return db_forge_obj(store, mock_class, mock_fields)
+def forge_obj(session, mock_class, mock_fields):
+    return db_forge_obj(session, mock_class, mock_fields)
 
 
-def db_get(store, model, *args, **kwargs):
-    ret = store.find(model, *args, **kwargs).one()
+def db_get(session, model, *args, **kwargs):
+    if isinstance(model, collections.Iterable):
+        ret = session.query(*model).filter(*args, **kwargs).one_or_none()
+    else:
+        ret = session.query(model).filter(*args, **kwargs).one_or_none()
+
     if ret is None:
         raise errors.ModelNotFound(model)
 
@@ -35,29 +39,35 @@ def db_get(store, model, *args, **kwargs):
 
 
 @transact
-def get(store, model, *args, **kwargs):
-    return db_get(store, model, *args, **kwargs)
+def get(session, model, *args, **kwargs):
+    return db_get(session, model, *args, **kwargs)
 
 
-def db_delete(store, model, *args, **kwargs):
-    return store.find(model, *args, **kwargs).remove()
+def db_delete(session, model, *args, **kwargs):
+    if isinstance(model, collections.Iterable):
+        q = session.query(*model).filter(*args, **kwargs)
+    else:
+        q = session.query(model).filter(*args, **kwargs)
+
+    return q.delete(synchronize_session='fetch')
 
 
 @transact
-def delete(store, model, *args, **kwargs):
-    return db_delete(store, model, *args, **kwargs)
+def delete(session, model, *args, **kwargs):
+    return db_delete(session, model, *args, **kwargs)
 
 
-class Model(Storm):
+
+Base = declarative_base()
+
+
+class Model(object):
     """
     Globaleaks's most basic model.
 
     Define a set of methods on the top of Storm to simplify
     creation/access/update/deletions of data.
     """
-    __metaclass__ = MetaModel
-    __storm_table__ = None
-
     # initialize empty list for the base classes
     properties = []
     unicode_keys = []
@@ -72,6 +82,8 @@ class Model(Storm):
 
     def __init__(self, values=None, migrate=False):
         self.update(values)
+
+        self.properties =  [c.key for c in self.__table__.columns]
 
     def update(self, values=None):
         """
@@ -151,13 +163,17 @@ class Model(Storm):
         for k in self.properties:
             value = getattr(self, k)
 
-            if k in self.localized_keys:
-                value = value[language] if language in value else u''
+            if value is not None:
+                if k in self.localized_keys:
+                    ret[k] = value[language] if language in value else u''
 
-            elif k in self.date_keys:
-                value = datetime_to_ISO8601(value)
-
-            ret[k] = value
+                elif k in self.date_keys:
+                    ret[k] = datetime_to_ISO8601(value)
+            else:
+                if self.__table__.columns[k].default and not callable(self.__table__.columns[k].default.arg):
+                    ret[k] = self.__table__.columns[k].default.arg
+                else:
+                    ret[k] = ''
 
         for k in self.list_keys:
             ret[k] = []
@@ -169,73 +185,85 @@ class ModelWithID(Model):
     """
     Base class for working the database, already integrating an id.
     """
-    __storm_table__ = None
-    id = Unicode(primary=True, default_factory=uuid4)
+    id = Column(String, primary_key=True, default=uuid4)
 
 
 class ModelWithTID(Model):
     """
     Base class for models requiring a TID
     """
-    __storm_table__ = None
+    __tablename__ = None
 
-    tid = Int(primary=True, default=1)
+    @declared_attr
+    def tid(cls):
+        # pylint: disable=no-self-argument
+        return Column(ForeignKey('tenant.id', ondelete='CASCADE'), primary_key=True, default=1)
 
 
 class ModelWithTIDandID(Model):
     """
     Base class for models requiring a TID and an ID
     """
-    __storm_table__ = None
+    __tablename__ = None
 
-    tid = Int(default=1)
-    id = Unicode(primary=True, default_factory=uuid4)
+    id = Column(String, primary_key=True, default=uuid4)
+
+    @declared_attr
+    def tid(cls):
+        # pylint: disable=no-self-argument
+        return Column(ForeignKey('tenant.id', ondelete='CASCADE'), primary_key=True, default=1)
 
 
-class Tenant(ModelWithID):
+class Tenant(ModelWithID, Base):
     """
     Class used to implement tenants
     """
-    id = Int(primary=True)
-    label = Unicode(default=u'')
-    active = Bool(default=True)
-    creation_date = DateTime(default_factory=datetime_now)
-    subdomain = Unicode(default=u'')
+    __tablename__ = 'tenant'
+    id = Column(Integer, primary_key=True)
+    label = Column(String, default=u'')
+    active = Column(BOOLEAN, default=True)
+    creation_date = Column(DATETIME, default=datetime_now)
+    subdomain = Column(String, default=u'')
 
     unicode_keys = ['label', 'subdomain']
     bool_keys = ['active']
 
 
-class User(ModelWithTIDandID):
+class User(ModelWithTIDandID, Base):
     """
     This model keeps track of globaleaks users.
     """
-    creation_date = DateTime(default_factory=datetime_now)
+    __tablename__ = 'user'
 
-    username = Unicode(default=u'')
+    creation_date = Column(DATETIME, default=datetime_now)
 
-    password = Unicode(default=u'')
-    salt = Unicode()
+    username = Column(String, default=u'')
 
-    name = Unicode(default=u'')
-    description = JSON(default_factory=dict)
+    password = Column(String, default=u'')
+    salt = Column(String)
 
-    public_name = Unicode(default=u'')
+    name = Column(String, default=u'')
+    description = Column(JSON, default="dict")
+
+    public_name = Column(String, default=u'')
 
     # roles: 'admin', 'receiver', 'custodian'
-    role = Unicode(default=u'receiver')
-    state = Unicode(default=u'enabled')
-    last_login = DateTime(default_factory=datetime_null)
-    mail_address = Unicode(default=u'')
-    language = Unicode()
-    password_change_needed = Bool(default=True)
-    password_change_date = DateTime(default_factory=datetime_null)
+    role = Column(String, default=u'receiver')
+    state = Column(String, default=u'enabled')
+    last_login = Column(DATETIME, default=datetime_null)
+    mail_address = Column(String, default=u'')
+    language = Column(String)
+    password_change_needed = Column(BOOLEAN, default=True)
+    password_change_date = Column(DATETIME, default=datetime_null)
 
     # BEGIN of PGP key fields
-    pgp_key_fingerprint = Unicode(default=u'')
-    pgp_key_public = Unicode(default=u'')
-    pgp_key_expiration = DateTime(default_factory=datetime_null)
+    pgp_key_fingerprint = Column(String, default=u'')
+    pgp_key_public = Column(String, default=u'')
+    pgp_key_expiration = Column(DATETIME, default=datetime_null)
     # END of PGP key fields
+
+    __table_args__ = (CheckConstraint(role.in_(['admin','receiver', 'custodian'])), \
+                      CheckConstraint(state.in_(['disabled', 'enabled'])))
 
     unicode_keys = ['username', 'role', 'state',
                     'language', 'mail_address', 'name',
@@ -248,38 +276,40 @@ class User(ModelWithTIDandID):
     date_keys = ['creation_date', 'last_login', 'password_change_date', 'pgp_key_expiration']
 
 
-class Context(ModelWithTIDandID):
+class Context(ModelWithTIDandID, Base):
     """
     This model keeps track of contexts settings.
     """
-    show_small_receiver_cards = Bool(default=False)
-    show_context = Bool(default=True)
-    show_recipients_details = Bool(default=False)
-    allow_recipients_selection = Bool(default=False)
-    maximum_selectable_receivers = Int(default=0)
-    select_all_receivers = Bool(default=True)
+    __tablename__ = 'context'
 
-    enable_comments = Bool(default=True)
-    enable_messages = Bool(default=False)
-    enable_two_way_comments = Bool(default=True)
-    enable_two_way_messages = Bool(default=True)
-    enable_attachments = Bool(default=True) # Lets WB attach files to submission
-    enable_rc_to_wb_files = Bool(default=False) # The name says it all folks
+    show_small_receiver_cards = Column(BOOLEAN, default=False)
+    show_context = Column(BOOLEAN, default=True)
+    show_recipients_details = Column(BOOLEAN, default=False)
+    allow_recipients_selection = Column(BOOLEAN, default=False)
+    maximum_selectable_receivers = Column(Integer, default=0)
+    select_all_receivers = Column(BOOLEAN, default=True)
 
-    tip_timetolive = Int(default=15) # in days, -1 indicates no expiration
+    enable_comments = Column(BOOLEAN, default=True)
+    enable_messages = Column(BOOLEAN, default=False)
+    enable_two_way_comments = Column(BOOLEAN, default=True)
+    enable_two_way_messages = Column(BOOLEAN, default=True)
+    enable_attachments = Column(BOOLEAN, default=True) # Lets WB attach files to submission
+    enable_rc_to_wb_files = Column(BOOLEAN, default=False) # The name says it all folks
+
+    tip_timetolive = Column(Integer, default=15) # in days, -1 indicates no expiration
 
     # localized strings
-    name = JSON(default_factory=dict)
-    description = JSON(default_factory=dict)
-    recipients_clarification = JSON(default_factory=dict)
+    name = Column(JSON, default=dict)
+    description = Column(JSON, default=dict)
+    recipients_clarification = Column(JSON, default=dict)
 
-    status_page_message = JSON(default_factory=dict)
+    status_page_message = Column(JSON, default=dict)
 
-    show_receivers_in_alphabetical_order = Bool(default=True)
+    show_receivers_in_alphabetical_order = Column(BOOLEAN, default=True)
 
-    presentation_order = Int(default=0)
+    presentation_order = Column(Integer, default=0)
 
-    questionnaire_id = Unicode(default=u'default')
+    questionnaire_id = Column(String, default=u'default')
 
     unicode_keys = ['questionnaire_id']
 
@@ -309,110 +339,126 @@ class Context(ModelWithTIDandID):
     list_keys = ['receivers']
 
 
-class InternalTip(ModelWithTIDandID):
+class InternalTip(ModelWithTIDandID, Base):
     """
     This is the internal representation of a Tip that has been submitted
     """
-    creation_date = DateTime(default_factory=datetime_now)
-    update_date = DateTime(default_factory=datetime_now)
+    __tablename__ = 'internaltip'
 
-    context_id = Unicode()
+    creation_date = Column(DATETIME, default=datetime_now)
+    update_date = Column(DATETIME, default=datetime_now)
 
-    questionnaire_hash = Unicode()
-    preview = JSON()
-    progressive = Int(default=0)
-    tor2web = Bool(default=False)
-    total_score = Int(default=0)
-    expiration_date = DateTime()
+    context_id = Column(String)
+    questionnaire_hash = Column(String)
 
-    identity_provided = Bool(default=False)
-    identity_provided_date = DateTime(default_factory=datetime_null)
+    preview = Column(JSON)
+    progressive = Column(Integer, default=0)
+    tor2web = Column(BOOLEAN, default=False)
+    total_score = Column(Integer, default=0)
+    expiration_date = Column(DATETIME)
 
-    enable_two_way_comments = Bool(default=True)
-    enable_two_way_messages = Bool(default=True)
-    enable_attachments = Bool(default=True)
-    enable_whistleblower_identity = Bool(default=False)
+    identity_provided = Column(BOOLEAN, default=False)
+    identity_provided_date = Column(DATETIME, default=datetime_null)
 
-    receipt_hash = Unicode(default=u'')
+    enable_two_way_comments = Column(BOOLEAN, default=True)
+    enable_two_way_messages = Column(BOOLEAN, default=True)
+    enable_attachments = Column(BOOLEAN, default=True)
+    enable_whistleblower_identity = Column(BOOLEAN, default=False)
 
-    wb_last_access = DateTime(default_factory=datetime_now)
-    wb_access_counter = Int(default=0)
+    receipt_hash = Column(String, default=u'')
+
+    wb_last_access = Column(DATETIME, default=datetime_now)
+    wb_access_counter = Column(Integer, default=0)
+
+    __table_args__ = (ForeignKeyConstraint(['tid', 'context_id'], ['context.tid', 'context.id'], ondelete='CASCADE'), )
 
 
-class ReceiverTip(ModelWithTIDandID):
+class ReceiverTip(ModelWithTIDandID, Base):
     """
     This is the table keeping track of ALL the receivers activities and
     date in a Tip, Tip core data are stored in StoredTip. The data here
     provide accountability of Receiver accesses, operations, options.
     """
-    internaltip_id = Unicode()
-    receiver_id = Unicode()
+    __tablename__ = 'receivertip'
 
-    last_access = DateTime(default_factory=datetime_null)
-    access_counter = Int(default=0)
+    internaltip_id = Column(String)
+    receiver_id = Column(String)
 
-    label = Unicode(default=u'')
+    last_access = Column(DATETIME, default=datetime_null)
+    access_counter = Column(Integer, default=0)
 
-    can_access_whistleblower_identity = Bool(default=False)
+    label = Column(String, default=u'')
 
-    new = Int(default=True)
+    can_access_whistleblower_identity = Column(BOOLEAN, default=False)
 
-    enable_notifications = Bool(default=True)
+    new = Column(Integer, default=True)
+
+    enable_notifications = Column(BOOLEAN, default=True)
+
+    __table_args__ = (ForeignKeyConstraint(['tid', 'internaltip_id'], ['internaltip.tid', 'internaltip.id'], ondelete='CASCADE'),
+                      ForeignKeyConstraint(['tid', 'receiver_id'], ['receiver.tid', 'receiver.id'], ondelete='CASCADE'))
 
     unicode_keys = ['label']
 
     bool_keys = ['enable_notifications']
 
 
-class IdentityAccessRequest(ModelWithTIDandID):
+class IdentityAccessRequest(ModelWithTIDandID, Base):
     """
     This model keeps track of identity access requests by receivers and
     of the answers by custodians.
     """
-    receivertip_id = Unicode()
-    request_date = DateTime(default_factory=datetime_now)
-    request_motivation = Unicode(default=u'')
-    reply_date = DateTime(default_factory=datetime_null)
-    reply_user_id = Unicode(default=u'')
-    reply_motivation = Unicode(default=u'')
-    reply = Unicode(default=u'pending')
+    __tablename__ = 'identityaccessrequest'
+    receivertip_id = Column(String)
+    request_date = Column(DATETIME, default=datetime_now)
+    request_motivation = Column(String, default=u'')
+    reply_date = Column(DATETIME, default=datetime_null)
+    reply_user_id = Column(String, default=u'')
+    reply_motivation = Column(String, default=u'')
+    reply = Column(String, default=u'pending')
+
+    __table_args__ = (ForeignKeyConstraint(['tid', 'receivertip_id'], ['receivertip.tid', 'receivertip.id'], ondelete='CASCADE'),)
 
 
-class InternalFile(ModelWithTIDandID):
+class InternalFile(ModelWithTIDandID, Base):
     """
     This model keeps track of submission files
     """
-    creation_date = DateTime(default_factory=datetime_now)
+    __tablename__ = 'internalfile'
+    creation_date = Column(DATETIME, default=datetime_now)
 
-    internaltip_id = Unicode()
+    internaltip_id = Column(String)
 
-    name = Unicode()
-    file_path = Unicode()
+    name = Column(String)
+    file_path = Column(String)
 
-    content_type = Unicode()
-    size = Int()
+    content_type = Column(String)
+    size = Column(Integer)
 
-    new = Int(default=True)
+    new = Column(Integer, default=True)
 
-    submission = Int(default = False)
+    submission = Column(Integer, default = False)
 
-    processing_attempts = Int(default=0)
+    processing_attempts = Column(Integer, default=0)
+
+    __table_args__ = (ForeignKeyConstraint(['tid', 'internaltip_id'], ['internaltip.tid', 'internaltip.id'], ondelete='CASCADE'),)
 
 
-class ReceiverFile(ModelWithTIDandID):
+class ReceiverFile(ModelWithTIDandID, Base):
     """
     This model keeps track of files destinated to a specific receiver
     """
-    internalfile_id = Unicode()
-    receivertip_id = Unicode()
-    file_path = Unicode()
-    size = Int()
-    downloads = Int(default=0)
-    last_access = DateTime(default_factory=datetime_null)
+    __tablename__ = 'receiverfile'
+    internalfile_id = Column(String)
+    receivertip_id = Column(String)
+    file_path = Column(String)
+    size = Column(Integer)
+    downloads = Column(Integer, default=0)
+    last_access = Column(DATETIME, default=datetime_null)
 
-    new = Int(default=True)
+    new = Column(Integer, default=True)
 
-    status = Unicode()
+    status = Column(String)
     # statuses: 'reference', 'encrypted', 'unavailable', 'nokey'
     # reference = receiverfile.file_path reference internalfile.file_path
     # encrypted = receiverfile.file_path is an encrypted file for
@@ -420,86 +466,109 @@ class ReceiverFile(ModelWithTIDandID):
     # unavailable = the file was supposed to be available but something goes
     # wrong and now is lost
 
+    __table_args__ = (ForeignKeyConstraint(['tid', 'internalfile_id'], ['internalfile.tid', 'internalfile.id'], ondelete='CASCADE'),
+                      ForeignKeyConstraint(['tid', 'receivertip_id'], ['receivertip.tid', 'receivertip.id'], ondelete='CASCADE'),
+                      CheckConstraint(status.in_(['processing', 'reference', 'encrypted', 'unavailable', 'nokey'])))
 
-class WhistleblowerFile(ModelWithTIDandID):
+
+class WhistleblowerFile(ModelWithTIDandID, Base):
     """
     This models stores metadata of files uploaded by recipients intended to be
     delivered to the whistleblower. This file is not encrypted and nor is it
     integrity checked in any meaningful way.
     """
-    receivertip_id = Unicode()
+    __tablename__ = 'whistleblowerfile'
+    receivertip_id = Column(String)
 
-    name = Unicode()
-    file_path = Unicode()
-    size = Int()
-    content_type = Unicode()
-    downloads = Int(default=0)
-    creation_date = DateTime(default_factory=datetime_now)
-    last_access = DateTime(default_factory=datetime_null)
-    description = Unicode()
+    name = Column(String)
+    file_path = Column(String)
+    size = Column(Integer)
+    content_type = Column(String)
+    downloads = Column(Integer, default=0)
+    creation_date = Column(DATETIME, default=datetime_now)
+    last_access = Column(DATETIME, default=datetime_null)
+    description = Column(String)
+
+    __table_args__ = (ForeignKeyConstraint(['tid', 'receivertip_id'], ['receivertip.tid', 'receivertip.id'], ondelete='CASCADE'),)
 
 
-class Comment(ModelWithTIDandID):
+class Comment(ModelWithTIDandID, Base):
     """
     This table handle the comment collection, has an InternalTip referenced
     """
-    creation_date = DateTime(default_factory=datetime_now)
+    __tablename__ = 'comment'
+    creation_date = Column(DATETIME, default=datetime_now)
 
-    internaltip_id = Unicode()
+    internaltip_id = Column(String)
 
-    author_id = Unicode()
-    content = Unicode()
+    author_id = Column(String)
+    content = Column(String)
 
-    type = Unicode()
+    type = Column(String)
     # types: 'receiver', 'whistleblower'
 
-    new = Int(default=True)
+    new = Column(Integer, default=True)
+
+    __table_args__ = (ForeignKeyConstraint(['tid', 'internaltip_id'], ['internaltip.tid', 'internaltip.id'], ondelete='CASCADE'),
+                      ForeignKeyConstraint(['tid', 'author_id'], ['user.tid', 'user.id'], ondelete='CASCADE'))
 
 
-class Message(ModelWithTIDandID):
+class Message(ModelWithTIDandID, Base):
     """
     This table handle the direct messages between whistleblower and one
     Receiver.
     """
-    creation_date = DateTime(default_factory=datetime_now)
+    __tablename__ = 'message'
+    creation_date = Column(DATETIME, default=datetime_now)
 
-    receivertip_id = Unicode()
-    content = Unicode()
+    receivertip_id = Column(String)
+    content = Column(String)
 
-    type = Unicode()
+    type = Column(String)
     # types: 'receiver', whistleblower'
 
-    new = Int(default=True)
+    new = Column(Integer, default=True)
+
+    __table_args__ = (ForeignKeyConstraint(['tid', 'receivertip_id'], ['receivertip.tid', 'receivertip.id'], ondelete='CASCADE'),
+                      CheckConstraint(type.in_(['receiver', 'whistleblower'])))
 
 
-class Mail(ModelWithTIDandID):
+class Mail(ModelWithTIDandID, Base):
     """
     This model keeps track of emails to be spooled by the system
     """
-    creation_date = DateTime(default_factory=datetime_now)
+    __tablename__ = 'mail'
+    creation_date = Column(DATETIME, default=datetime_now)
 
-    address = Unicode()
-    subject = Unicode()
-    body = Unicode()
+    address = Column(String)
+    subject = Column(String)
+    body = Column(String)
 
-    processing_attempts = Int(default=0)
+    processing_attempts = Column(Integer, default=0)
 
     unicode_keys = ['address', 'subject', 'body']
 
 
-class Receiver(ModelWithTIDandID):
+class Receiver(ModelWithTID, Base):
     """
     This model keeps track of receivers settings.
     """
-    configuration = Unicode(default=u'default')
+    __tablename__ = 'receiver'
+
+    id = Column(String, primary_key=True)
+
+    configuration = Column(String, default=u'default')
     # configurations: 'default', 'forcefully_selected', 'unselectable'
 
     # Admin chosen options
-    can_delete_submission = Bool(default=False)
-    can_postpone_expiration = Bool(default=False)
-    can_grant_permissions = Bool(default=False)
+    can_delete_submission = Column(BOOLEAN, default=False)
+    can_postpone_expiration = Column(BOOLEAN, default=False)
+    can_grant_permissions = Column(BOOLEAN, default=False)
 
-    tip_notification = Bool(default=True)
+    tip_notification = Column(BOOLEAN, default=True)
+
+    __table_args__ = (ForeignKeyConstraint(['tid', 'id'], ['user.tid', 'user.id'], ondelete='CASCADE'),
+                      CheckConstraint(configuration.in_(['default', 'forcefully_selected', 'unselectable'])))
 
     unicode_keys = ['configuration']
 
@@ -513,35 +582,65 @@ class Receiver(ModelWithTIDandID):
     list_keys = ['contexts']
 
 
-class Field(ModelWithTIDandID):
-    x = Int(default=0)
-    y = Int(default=0)
-    width = Int(default=0)
+class Field(ModelWithTIDandID, Base):
+    __tablename__ = 'field'
 
-    label = JSON()
-    description = JSON()
-    hint = JSON()
+    x = Column(Integer, default=0)
+    y = Column(Integer, default=0)
+    width = Column(Integer, default=0)
 
-    required = Bool(default=False)
-    preview = Bool(default=False)
+    label = Column(JSON)
+    description = Column(JSON)
+    hint = Column(JSON)
 
-    multi_entry = Bool(default=False)
-    multi_entry_hint = JSON()
+    required = Column(BOOLEAN, default=False)
+    preview = Column(BOOLEAN, default=False)
+
+    multi_entry = Column(BOOLEAN, default=False)
+    multi_entry_hint = Column(JSON)
 
     # This is set if the field should be duplicated for collecting statistics
     # when encryption is enabled.
-    stats_enabled = Bool(default=False)
+    stats_enabled = Column(BOOLEAN, default=False)
 
-    triggered_by_score = Int(default=0)
+    triggered_by_score = Column(Integer, default=0)
 
-    fieldgroup_id = Unicode()
-    step_id = Unicode()
-    template_id = Unicode()
+    fieldgroup_id = Column(String)
+    step_id = Column(String)
+    template_id = Column(String)
 
-    type = Unicode(default=u'inputbox')
+    type = Column(String, default=u'inputbox')
 
-    instance = Unicode(default=u'instance')
-    editable = Bool(default=True)
+    instance = Column(String, default=u'instance')
+    editable = Column(BOOLEAN, default=True)
+
+    __table_args__ = (ForeignKeyConstraint(['tid', 'step_id'], ['step.tid', 'step.id'], ondelete='CASCADE'),
+                      ForeignKeyConstraint(['tid', 'fieldgroup_id'], ['field.tid', 'field.id'], ondelete='CASCADE'),
+                      ForeignKeyConstraint(['tid', 'template_id'], ['field.tid', 'field.id'], ondelete='CASCADE'),
+                      CheckConstraint(type.in_(['inputbox',
+                                                'textarea',
+                                                'multichoice',
+                                                'selectbox',
+                                                'checkbox',
+                                                'modal',
+                                                'dialog',
+                                                'tos',
+                                                'fileupload',
+                                                'number',
+                                                'date',
+                                                'email',
+                                                'fieldgroup'])), \
+                      CheckConstraint(instance.in_(['instance',
+                                                    'reference',
+                                                    'template'])),
+                      CheckConstraint("((instance IS 'instance' AND template_id IS NULL AND \
+                                                                    ((step_id IS NOT NULL AND fieldgroup_id IS NULL) OR \
+                                                                    (step_id IS NULL AND fieldgroup_id IS NOT NULL))) OR \
+                                        (instance IS 'reference' AND template_id is NOT NULL AND \
+                                                                     ((step_id IS NOT NULL AND fieldgroup_id IS NULL) OR \
+                                                                     (step_id IS NULL AND fieldgroup_id IS NOT NULL))) OR \
+                                        (instance IS 'template' AND template_id IS NULL AND \
+                                                                    (step_id IS NULL OR fieldgroup_id IS NULL)))"))
 
     unicode_keys = ['type', 'instance', 'key']
     int_keys = ['x', 'y', 'width', 'triggered_by_score']
@@ -550,11 +649,18 @@ class Field(ModelWithTIDandID):
     optional_references = ['template_id', 'step_id', 'fieldgroup_id']
 
 
-class FieldAttr(ModelWithTIDandID):
-    field_id = Unicode()
-    name = Unicode()
-    type = Unicode()
-    value = JSON()
+class FieldAttr(ModelWithTIDandID, Base):
+    __tablename__ = 'fieldattr'
+    field_id = Column(String)
+    name = Column(String)
+    type = Column(String)
+    value = Column(JSON)
+
+    __table_args__ = (ForeignKeyConstraint(['tid', 'field_id'], ['field.tid', 'field.id'], ondelete='CASCADE'),
+                      CheckConstraint(type.in_(['int',
+                                                'bool',
+                                                'unicode',
+                                                'localized'])),)
 
     # FieldAttr is a special model.
     # Here we consider all its attributes as unicode, then
@@ -582,12 +688,16 @@ class FieldAttr(ModelWithTIDandID):
             setattr(self, 'value', unicode(values['value']))
 
 
-class FieldOption(ModelWithTIDandID):
-    field_id = Unicode()
-    presentation_order = Int(default=0)
-    label = JSON()
-    score_points = Int(default=0)
-    trigger_field = Unicode()
+class FieldOption(ModelWithTIDandID, Base):
+    __tablename__ = 'fieldoption'
+    field_id = Column(String)
+    presentation_order = Column(Integer, default=0)
+    label = Column(JSON)
+    score_points = Column(Integer, default=0)
+    trigger_field = Column(String)
+
+    __table_args__ = (ForeignKeyConstraint(['tid', 'field_id'], ['field.tid', 'field.id'], ondelete='CASCADE'),
+                      ForeignKeyConstraint(['tid', 'trigger_field'], ['field.tid', 'field.id'], ondelete='CASCADE'))
 
     unicode_keys = ['field_id']
     int_keys = ['presentation_order', 'score_points']
@@ -595,155 +705,168 @@ class FieldOption(ModelWithTIDandID):
     optional_references = ['trigger_field']
 
 
-class FieldAnswer(ModelWithTIDandID):
-    internaltip_id = Unicode()
-    fieldanswergroup_id = Unicode()
-    key = Unicode(default=u'')
-    is_leaf = Bool(default=True)
-    value = Unicode(default=u'')
+class FieldAnswer(ModelWithTIDandID, Base):
+    __tablename__ = 'fieldanswer'
+    internaltip_id = Column(String)
+    fieldanswergroup_id = Column(String)
+    key = Column(String, default=u'')
+    is_leaf = Column(BOOLEAN, default=True)
+    value = Column(String, default=u'')
+
+    __table_args__ = (ForeignKeyConstraint(['tid', 'internaltip_id'], ['internaltip.tid', 'internaltip.id'], ondelete='CASCADE'),
+                      ForeignKeyConstraint(['tid', 'fieldanswergroup_id'], ['fieldanswergroup.tid', 'fieldanswergroup.id'], ondelete='CASCADE'))
 
     unicode_keys = ['internaltip_id', 'key', 'value']
     bool_keys = ['is_leaf']
 
 
-class FieldAnswerGroup(ModelWithTIDandID):
-    number = Int(default=0)
-    fieldanswer_id = Unicode()
+class FieldAnswerGroup(ModelWithTIDandID, Base):
+    __tablename__ = 'fieldanswergroup'
+    number = Column(Integer, default=0)
+    fieldanswer_id = Column(String)
+
+    __table_args__ = (ForeignKeyConstraint(['tid', 'fieldanswer_id'], ['fieldanswer.tid', 'fieldanswer.id'], ondelete='CASCADE'),)
 
     unicode_keys = ['fieldanswer_id']
     int_keys = ['number']
 
 
-class Step(ModelWithTIDandID):
-    questionnaire_id = Unicode()
-    label = JSON()
-    description = JSON()
-    presentation_order = Int(default=0)
+class Step(ModelWithTIDandID, Base):
+    __tablename__ = 'step'
+    questionnaire_id = Column(String)
+    label = Column(JSON)
+    description = Column(JSON)
+    presentation_order = Column(Integer, default=0)
+
+    __table_args__ = (ForeignKeyConstraint(['tid', 'questionnaire_id'], ['questionnaire.tid', 'questionnaire.id'], ondelete='CASCADE'),)
 
     unicode_keys = ['questionnaire_id']
     int_keys = ['presentation_order']
     localized_keys = ['label', 'description']
 
 
-class Questionnaire(ModelWithTIDandID):
-    name = Unicode(default=u'')
-    enable_whistleblower_identity = Bool(default=False)
-    editable = Bool(default=True)
+class Questionnaire(ModelWithTIDandID, Base):
+    __tablename__ = 'questionnaire'
+    name = Column(String, default=u'')
+    enable_whistleblower_identity = Column(BOOLEAN, default=False)
+    editable = Column(BOOLEAN, default=True)
 
     # TODO: this variables are unused and should be removed at next migration
-    show_steps_navigation_bar = Bool(default=False)
-    steps_navigation_requires_completion = Bool(default=False)
+    show_steps_navigation_bar = Column(BOOLEAN, default=False)
+    steps_navigation_requires_completion = Column(BOOLEAN, default=False)
 
     unicode_keys = ['name']
-
-    bool_keys = [
-      'editable'
-    ]
-
+    bool_keys = ['editable']
     list_keys = ['steps']
 
 
-class ArchivedSchema(Model):
-    __storm_primary__ = 'hash', 'type'
-
-    hash = Unicode()
-    type = Unicode()
-    schema = JSON()
+class ArchivedSchema(Model, Base):
+    __tablename__ = 'archivedschema'
+    hash = Column(String, primary_key=True)
+    type = Column(String, primary_key=True)
+    schema = Column(JSON)
 
     unicode_keys = ['hash']
 
 
-class Stats(ModelWithTIDandID):
-    start = DateTime()
-    summary = JSON()
+class Stats(ModelWithTIDandID, Base):
+    __tablename__ = 'stats'
+    start = Column(DATETIME)
+    summary = Column(JSON)
 
 
-class Anomalies(ModelWithTIDandID):
-    date = DateTime()
-    alarm = Int()
-    events = JSON()
+class Anomalies(ModelWithTIDandID, Base):
+    __tablename__ = 'anomalies'
+    date = Column(DATETIME)
+    alarm = Column(Integer)
+    events = Column(JSON)
 
 
-class SecureFileDelete(Model):
-    filepath = Unicode(primary=True)
+class SecureFileDelete(Model, Base):
+    __tablename__ = 'securefiledelete'
+    filepath = Column(String, primary_key=True)
 
 
 # Follow classes used for Many to Many references
-class ReceiverContext(ModelWithTID):
+class ReceiverContext(ModelWithTID, Base):
     """
     Class used to implement references between Receivers and Contexts
     """
-    __storm_table__ = 'receiver_context'
-    __storm_primary__ = 'tid', 'context_id', 'receiver_id'
+    __tablename__ = 'receiver_context'
+
+    context_id = Column(String, primary_key=True)
+    receiver_id = Column(String, primary_key=True)
+    presentation_order = Column(Integer, default=0)
+
+    __table_args__ = (ForeignKeyConstraint(['tid', 'context_id'], ['context.tid', 'context.id'], ondelete='CASCADE'),
+                      ForeignKeyConstraint(['tid', 'receiver_id'], ['receiver.tid', 'receiver.id'], ondelete='CASCADE'))
 
     unicode_keys = ['context_id', 'receiver_id']
     int_keys = ['presentation_order']
 
-    context_id = Unicode()
-    receiver_id = Unicode()
-    presentation_order = Int(default=0)
 
-
-class Counter(ModelWithTID):
+class Counter(ModelWithTID, Base):
     """
     Class used to implement unique counters
     """
-    __storm_primary__ = 'tid', 'key'
-
-    key = Unicode(primary=True)
-    counter = Int(default=1)
-    update_date = DateTime(default_factory=datetime_now)
+    __tablename__ = 'counter'
+    key = Column(String, primary_key=True)
+    counter = Column(Integer, default=1)
+    update_date = Column(DATETIME, default=datetime_now)
 
     unicode_keys = ['key']
     int_keys = ['number']
 
 
-class ShortURL(ModelWithTIDandID):
+class ShortURL(ModelWithTIDandID, Base):
     """
     Class used to implement url shorteners
     """
-    shorturl = Unicode()
-    longurl = Unicode()
+    __tablename__ = 'shorturl'
+    shorturl = Column(String)
+    longurl = Column(String)
 
     unicode_keys = ['shorturl', 'longurl']
 
 
-class File(ModelWithTIDandID):
+class File(ModelWithTIDandID, Base):
     """
     Class used for storing files
     """
-    name = Unicode(default=u'')
-    data = Unicode(default=u'')
+    __tablename__ = 'file'
+    name = Column(String, default=u'')
+    data = Column(String, default=u'')
 
     unicode_keys = ['data', 'name']
 
 
-class UserImg(ModelWithTIDandID):
+class UserImg(ModelWithTIDandID, Base):
     """
     Class used for storing user pictures
     """
-    data = Unicode()
+    __tablename__ = 'userimg'
+    data = Column(String)
 
     unicode_keys = ['data']
 
 
-class ContextImg(ModelWithTIDandID):
+class ContextImg(ModelWithTIDandID, Base):
     """
     Class used for storing context pictures
     """
-    data = Unicode()
+    __tablename__ = 'contextimg'
+    data = Column(String)
 
     unicode_keys = ['data']
 
 
-class CustomTexts(ModelWithTID):
+class CustomTexts(ModelWithTID, Base):
     """
     Class used to implement custom texts
     """
-    __storm_primary__ = 'tid', 'lang'
-
-    lang = Unicode()
-    texts = JSON()
+    __tablename__ = 'customtexts'
+    lang = Column(String, primary_key=True)
+    texts = Column(JSON)
 
     unicode_keys = ['lang']
     json_keys = ['texts']

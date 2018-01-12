@@ -1,27 +1,25 @@
 # -*- coding: utf-8 -*-
-from storm.expr import Not, In
-from storm.locals import Bool, Unicode, JSON
+from sqlalchemy import Column, Integer, String, not_
+from sqlalchemy.dialects.sqlite import BOOLEAN
 
 from globaleaks import __version__
-from globaleaks.models import config_desc, ModelWithTID, Tenant
+from globaleaks.models import config_desc, Base, ModelWithTID, Tenant, JSON
 from globaleaks.models.config_desc import ConfigDescriptor, ConfigFilters
 
 
-class Config(ModelWithTID):
-    __storm_table__ = 'config'
-    __storm_primary__ = ('tid', 'var_name')
+class Config(ModelWithTID, Base):
+    __tablename__ = 'config'
 
     cfg_desc = ConfigDescriptor
-    var_name = Unicode()
-    value = JSON()
-    customized = Bool(default=False)
-
+    var_name = Column(String, primary_key=True)
+    value = Column(JSON)
+    customized = Column(BOOLEAN, default=False)
 
     def __init__(self, tid=1, name=None, value=None, cfg_desc=None, migrate=False):
         """
         :param value:    This input is passed directly into set_v
         :param migrate:  Added to comply with models.Model constructor which is
-                         used to copy every field returned by storm from the db
+                         used to copy every field returned by the ORM from the db
                          from an old_obj to a new one.
         :param cfg_desc: Used to specify where to look for the Config objs descripitor.
                          This is used in mig 34.
@@ -65,14 +63,14 @@ class ConfigFactory(object):
     update_set = frozenset() # keys updated when fact.update(d) is called
     group_desc = dict() # the corresponding dict in ConfigDescriptor
 
-    def __init__(self, store, tid, group, *args, **kwargs):
-        self.store = store
+    def __init__(self, session, tid, group, *args, **kwargs):
+        self.session = session
         self.tid = tid
         self.group = unicode(group)
         self.res = None
 
     def _query_group(self):
-        self.res = {c.var_name: c for c in self.store.find(Config, Config.tid==self.tid, In(Config.var_name, ConfigFilters[self.group]))}
+        self.res = {c.var_name: c for c in self.session.query(Config).filter(Config.tid == self.tid, Config.var_name.in_(ConfigFilters[self.group]))}
 
     def update(self, request):
         self._query_group()
@@ -82,7 +80,7 @@ class ConfigFactory(object):
             self.res[key].set_v(request[key])
 
     def get_cfg(self, var_name):
-        return self.store.find(Config, tid=self.tid, var_name=var_name).one()
+        return self.session.query(Config).filter(Config.tid == self.tid, Config.var_name == var_name).one()
 
     def get_val(self, var_name):
         return self.get_cfg(var_name).get_v()
@@ -106,20 +104,18 @@ class ConfigFactory(object):
         return k == g
 
     def clean_and_add(self):
-        self._query_group()
-
-        actual = [name for name in self.store.find(Config.var_name, Config.tid==self.tid)]
+        actual = [c[0] for c in self.session.query(Config.var_name).filter(Config.tid == self.tid)]
 
         allowed = ConfigDescriptor.keys()
 
-        missing = list(set(allowed) - set(actual))
-
-        for key in missing:
-            self.store.add(Config(self.tid, key, ConfigDescriptor[key].default))
-
         extra = list(set(actual) - set(allowed))
 
-        self.store.find(Config, Config.tid==self.tid, In(Config.var_name, extra)).remove()
+        if extra:
+            self.session.query(Config).filter(Config.tid == self.tid, Config.var_name.in_(extra)).delete(synchronize_session='fetch')
+
+        missing = list(set(allowed) - set(actual))
+        for key in missing:
+            self.session.add(Config(self.tid, key, ConfigDescriptor[key].default))
 
         return len(missing), len(extra)
 
@@ -147,8 +143,8 @@ class NodeFactory(ConfigFactory):
     update_set = admin_node
     group_desc = ConfigDescriptor
 
-    def __init__(self, store, tid, *args, **kwargs):
-        ConfigFactory.__init__(self, store, tid, 'node', *args, **kwargs)
+    def __init__(self, session, tid, *args, **kwargs):
+        ConfigFactory.__init__(self, session, tid, 'node', *args, **kwargs)
 
     def public_export(self):
         return self._export_group_dict(self.public_node)
@@ -163,8 +159,8 @@ class NotificationFactory(ConfigFactory):
     update_set = admin_notification
     group_desc = ConfigDescriptor
 
-    def __init__(self, store, tid, *args, **kwargs):
-        ConfigFactory.__init__(self, store, tid, 'notification', *args, **kwargs)
+    def __init__(self, session, tid, *args, **kwargs):
+        ConfigFactory.__init__(self, session, tid, 'notification', *args, **kwargs)
 
     def admin_export(self):
         return self._export_group_dict(self.admin_notification)
@@ -184,8 +180,8 @@ class PrivateFactory(ConfigFactory):
 
     group_desc = ConfigDescriptor
 
-    def __init__(self, store, tid, *args, **kwargs):
-        ConfigFactory.__init__(self, store, tid, 'private', *args, **kwargs)
+    def __init__(self, session, tid, *args, **kwargs):
+        ConfigFactory.__init__(self, session, tid, 'private', *args, **kwargs)
 
     def mem_copy_export(self):
         return self._export_group_dict(self.mem_export_set)
@@ -194,32 +190,32 @@ class PrivateFactory(ConfigFactory):
 factories = [NodeFactory, NotificationFactory, PrivateFactory]
 
 
-def system_cfg_init(store, tid):
+def system_cfg_init(session, tid):
     for var_name, desc in ConfigDescriptor.items():
-        if desc.default_factory is not None:
-            default = desc.default_factory()
+        if callable(desc.default):
+            default = desc.default()
         else:
             default = desc.default
 
-        store.add(Config(tid, var_name, default))
+        session.add(Config(tid, var_name, default))
 
 
-def update_defaults(store, tid):
-    store.find(Config, Config.tid == tid, Not(In(Config.var_name, ConfigDescriptor.keys()))).remove()
+def update_defaults(session, tid):
+    session.query(Config).filter(Config.tid == tid, not_(Config.var_name.in_(ConfigDescriptor.keys()))).delete(synchronize_session='fetch')
 
     for fact_model in factories:
-         fact_model(store, tid).clean_and_add()
+         fact_model(session, tid).clean_and_add()
 
     # Set the system version to the current aligned cfg
-    PrivateFactory(store, tid).set_val(u'version', __version__)
+    PrivateFactory(session, tid).set_val(u'version', __version__)
 
 
-def load_tls_dict(store, tid):
+def load_tls_dict(session, tid):
     """
     A quick and dirty function to grab all of the tls config for use in subprocesses
     """
-    priv = PrivateFactory(store, tid)
-    node = NodeFactory(store, tid)
+    priv = PrivateFactory(session, tid)
+    node = NodeFactory(session, tid)
 
     return {
         'ssl_key': priv.get_val(u'https_priv_key'),
@@ -231,5 +227,5 @@ def load_tls_dict(store, tid):
     }
 
 
-def load_tls_dict_list(store):
-    return [load_tls_dict(store, tid) for tid in store.find(Tenant.id)]
+def load_tls_dict_list(session):
+    return [load_tls_dict(session, tid[0]) for tid in session.query(Tenant.id)]
