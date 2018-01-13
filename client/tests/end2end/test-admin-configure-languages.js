@@ -42,7 +42,7 @@ describe('admin configure languages', function() {
     // Switch the default to english and disable german
     element.all(by.css('.non-default-language')).get(0).click();
 
-    element.all(by.css('.remove-lang-btn')).get(0).click();
+    element.all(by.css('.remove-lang-btn')).get(1).click();
 
     element.all(by.cssContainingText("button", "Save")).get(1).click();
 
